@@ -7,6 +7,7 @@ import {
   useLocalParticipant,
   useTracks,
   useVoiceAssistant,
+  useAgent,
 } from '@livekit/components-react';
 import { cn } from '@/lib/shadcn/utils';
 import { AudioVisualizer } from './audio-visualizer';
@@ -95,6 +96,7 @@ export function TileLayout({
   const { videoTrack: agentVideoTrack } = useVoiceAssistant();
   const [screenShareTrack] = useTracks([Track.Source.ScreenShare]);
   const cameraTrack: TrackReference | undefined = useLocalTrackRef(Track.Source.Camera);
+  const { state: agentState } = useAgent();
 
   const isCameraEnabled = cameraTrack && !cameraTrack.publication.isMuted;
   const isScreenShareEnabled = screenShareTrack && !screenShareTrack.publication.isMuted;
@@ -105,9 +107,46 @@ export function TileLayout({
   const videoWidth = agentVideoTrack?.publication.dimensions?.width ?? 0;
   const videoHeight = agentVideoTrack?.publication.dimensions?.height ?? 0;
 
+  const renderStatusBadge = () => {
+    switch (agentState) {
+      case 'listening':
+        return (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-pulse shadow-xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            🎤 Listening to you...
+          </div>
+        );
+      case 'thinking':
+        return (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-xs font-bold text-orange-600 dark:text-orange-400 animate-pulse shadow-xs">
+            <span className="h-2 w-2 rounded-full bg-orange-500 animate-bounce" />
+            🤔 Saathi is thinking...
+          </div>
+        );
+      case 'speaking':
+        return (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs font-bold text-teal-600 dark:text-teal-400 animate-pulse shadow-xs">
+            <span className="h-2 w-2 rounded-full bg-teal-500 animate-ping" />
+            🔊 Saathi is speaking...
+          </div>
+        );
+      default:
+        return (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-xs font-bold text-gray-500 dark:text-gray-400 shadow-xs">
+            💤 Connecting...
+          </div>
+        );
+    }
+  };
+
   return (
-    <div className="absolute inset-x-0 top-8 bottom-32 z-50 md:top-12 md:bottom-40">
-      <div className="relative mx-auto h-full max-w-2xl px-4 md:px-0">
+    <div className="absolute inset-x-0 top-8 bottom-32 z-50 md:top-12 md:bottom-40 flex flex-col items-center">
+      {/* Active speaker / listener status badge */}
+      <div className="h-10 mb-6 flex items-center justify-center">
+        {renderStatusBadge()}
+      </div>
+
+      <div className="relative mx-auto h-full max-w-2xl px-4 md:px-0 w-full flex-1">
         <div className={cn(tileViewClassNames.grid)}>
           {/* Agent */}
           <div

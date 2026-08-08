@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 function SparklesIcon() {
@@ -29,6 +30,29 @@ export const WelcomeView = ({
   onStartCall,
   ref,
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
+  const [micError, setMicError] = useState(false);
+
+  const handleStartCall = async () => {
+    setMicError(false);
+    try {
+      // Prompt browser mic permissions check
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      onStartCall();
+    } catch (err: any) {
+      console.error('Microphone check failed:', err);
+      if (
+        err.name === 'NotAllowedError' ||
+        err.name === 'PermissionDeniedError' ||
+        err.message?.includes('Permission denied')
+      ) {
+        setMicError(true);
+      } else {
+        onStartCall(); // Let LiveKit handle other minor issues
+      }
+    }
+  };
+
   return (
     <div ref={ref} className="relative w-full max-w-4xl px-4 py-8 mx-auto">
       {/* Background soft glowing blur elements */}
@@ -97,13 +121,33 @@ export const WelcomeView = ({
           <div className="absolute inset-0 bg-teal-500/25 rounded-full blur-md opacity-75 group-hover:opacity-100 transition-opacity animate-pulse pointer-events-none" />
           <Button
             size="lg"
-            onClick={onStartCall}
+            onClick={handleStartCall}
             className="relative w-full h-12 rounded-full bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 text-white font-bold tracking-wide transition-all shadow-lg hover:shadow-teal-500/20 active:scale-98 flex items-center justify-center gap-2 text-sm"
           >
             <SparklesIcon />
             {startButtonText}
           </Button>
         </div>
+
+        {/* Microphone Blocked Error Modal */}
+        {micError && (
+          <div className="mt-6 w-full max-w-md p-5 border border-red-500/25 bg-red-500/5 dark:bg-red-950/15 rounded-2xl text-left backdrop-blur-md animate-fade-in">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h4 className="font-bold text-red-600 dark:text-red-400 text-sm">Microphone Blocked</h4>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Saathi needs microphone permission to hear your questions.
+                </p>
+                <ol className="list-decimal pl-4 mt-2 text-[11px] text-muted-foreground space-y-1">
+                  <li>Click the <strong>Lock / Site Settings</strong> icon in your browser's address bar.</li>
+                  <li>Change the <strong>Microphone</strong> setting to <strong>Allow</strong>.</li>
+                  <li>Refresh this page and click start again!</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
 
       </section>
 
@@ -113,7 +157,7 @@ export const WelcomeView = ({
           Powered by <strong className="text-foreground/90">Murf Falcon</strong> (TTS) &amp; <strong className="text-foreground/90">Gemini 3.5</strong> (LLM) over <strong className="text-foreground/90">LiveKit</strong>
         </p>
         <p className="text-[10px] text-muted-foreground/60 max-w-xs">
-          Built for the Day 1 challenge of 10 Days of AI Voice Agents.
+          Built for the Day 3 challenge of 10 Days of AI Voice Agents.
         </p>
       </div>
     </div>
