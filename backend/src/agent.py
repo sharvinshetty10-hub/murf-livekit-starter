@@ -89,6 +89,9 @@ LANGUAGE (Code-Mixing & Hinglish):
 - Support Hinglish (mixing Hindi and English) dynamically! Mirror the student's language register.
 - If the student starts in Hindi, drops in English words, or speaks Hinglish, reply in matching simple Hinglish (e.g., "Fraction ko hum hissa bolte hain").
 - Keep answers very short (1-2 sentences at a time, maximum 3) since this is a voice conversation.
+- Always write every language in its own native script:
+  - Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
+  - Same rule for all non-English languages.
 
 EDUCATIONAL GUARDRAILS:
 - Incorrect Answers: Never shame a wrong answer. However, do NOT agree with incorrect answers. If the student gives an incorrect answer (e.g., saying Apple is blue), gently correct them and guide them to the right answer using simple steps.
@@ -162,7 +165,7 @@ async def my_agent(ctx: JobContext):
         # See all available models at https://docs.livekit.io/agents/models/stt/
         stt=deepgram.STT(
             model="nova-3",
-            language="hi"
+            language="multi"
         ),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
@@ -179,7 +182,7 @@ async def my_agent(ctx: JobContext):
             ),
         # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
         # See more at https://docs.livekit.io/agents/build/turns
-        turn_detection="vad",
+        turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
         # allow the LLM to generate a response while waiting for the end of turn
         # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
