@@ -1,17 +1,40 @@
 import logging
 import sys
 
-# Configure logging levels to suppress verbose debug messages containing unicode transcripts
+# Windows Unicode Terminal Encoding Safeguard to prevent UnicodeEncodeError in logs/console prints
+if sys.platform == "win32":
+    class SafeStream:
+        def __init__(self, original_stream):
+            self.original_stream = original_stream
+
+        def write(self, data):
+            try:
+                self.original_stream.write(data)
+            except UnicodeEncodeError:
+                try:
+                    # Fallback to ascii replacement encoding
+                    safe_data = data.encode('ascii', errors='replace').decode('ascii')
+                    self.original_stream.write(safe_data)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        def flush(self):
+            try:
+                self.original_stream.flush()
+            except Exception:
+                pass
+
+        def __getattr__(self, name):
+            return getattr(self.original_stream, name)
+
+    sys.stdout = SafeStream(sys.stdout)
+    sys.stderr = SafeStream(sys.stderr)
+
+# Suppress verbose debug log outputs
 logging.getLogger("livekit").setLevel(logging.INFO)
 logging.getLogger("livekit.plugins").setLevel(logging.INFO)
-
-# Reconfigure stdout/stderr to support UTF-8 on Windows to prevent UnicodeEncodeError in logs
-if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
 
 from dotenv import load_dotenv
 from livekit import rtc
