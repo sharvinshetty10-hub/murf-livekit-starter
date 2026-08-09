@@ -111,7 +111,7 @@ class Assistant(Agent):
         super().__init__(instructions=SYSTEM_PROMPT)
 
     @function_tool
-    def lookup_caller(self, context: RunContext) -> str:
+    async def lookup_caller(self, context: RunContext) -> str:
         """Looks up the profile of the current caller.
         Always call this at the very beginning of the session.
         """
@@ -122,7 +122,7 @@ class Assistant(Agent):
         return "New Caller: No profile found."
 
     @function_tool
-    def save_caller_info(
+    async def save_caller_info(
         self,
         context: RunContext,
         name: str,
