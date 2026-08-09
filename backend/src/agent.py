@@ -1,6 +1,10 @@
 import logging
 import sys
 
+# Configure logging levels to suppress verbose debug messages containing unicode transcripts
+logging.getLogger("livekit").setLevel(logging.INFO)
+logging.getLogger("livekit.plugins").setLevel(logging.INFO)
+
 # Reconfigure stdout/stderr to support UTF-8 on Windows to prevent UnicodeEncodeError in logs
 if sys.platform == "win32":
     try:
