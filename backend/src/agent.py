@@ -7,13 +7,22 @@ if sys.platform == "win32":
         def __init__(self, original_stream):
             self.original_stream = original_stream
 
+        @property
+        def encoding(self):
+            return "utf-8"
+
         def write(self, data):
+            if isinstance(data, bytes):
+                try:
+                    data = data.decode("utf-8", errors="replace")
+                except Exception:
+                    pass
             try:
                 self.original_stream.write(data)
             except UnicodeEncodeError:
                 try:
                     # Fallback to ascii replacement encoding
-                    safe_data = data.encode('ascii', errors='replace').decode('ascii')
+                    safe_data = data.encode("ascii", errors="replace").decode("ascii")
                     self.original_stream.write(safe_data)
                 except Exception:
                     pass
@@ -27,6 +36,8 @@ if sys.platform == "win32":
                 pass
 
         def __getattr__(self, name):
+            if name == "encoding":
+                return "utf-8"
             return getattr(self.original_stream, name)
 
     sys.stdout = SafeStream(sys.stdout)
