@@ -28,6 +28,14 @@ interface AppProps {
 
 export function App({ appConfig }: AppProps) {
   const tokenSource = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      let userId = localStorage.getItem('saathi_user_id');
+      if (!userId) {
+        userId = 'user_' + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem('saathi_user_id', userId);
+      }
+      return TokenSource.endpoint(`/api/token?userId=${userId}`);
+    }
     return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
       ? getSandboxTokenSource(appConfig)
       : TokenSource.endpoint('/api/token');

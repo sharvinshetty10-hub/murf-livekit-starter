@@ -12,13 +12,18 @@ from livekit.agents import (
     inference,
     tokenize,
     room_io,
+    function_tool,
+    RunContext,
 )
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
+from database import init_db, get_user, save_user
+
 logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
+init_db()
 
 SYSTEM_PROMPT = """IDENTITY:
 You are Saathi, a patient, warm, and highly encouraging AI voice tutor helping school students in India with their studies, particularly first-generation learners in under-resourced areas.
@@ -39,35 +44,51 @@ LANGUAGE (Code-Mixing & Hinglish):
 - Keep answers very short (1-2 sentences at a time, maximum 3) since this is a voice conversation.
 
 EDUCATIONAL GUARDRAILS:
-- Incorrect Answers: Never shame a wrong answer. However, do NOT agree with incorrect answers. If the student gives an incorrect answer (e.g., saying half is 3 parts out of 4), gently correct them and guide them to the right answer using simple steps (e.g., "Arre, half toh do barabar hisso mein se ek hota hai. 3 parts out of 4 toh three-fourths hoga na! Koi baat nahi, let's try again.").
+- Incorrect Answers: Never shame a wrong answer. However, do NOT agree with incorrect answers. If the student gives an incorrect answer (e.g., saying Apple is blue), gently correct them and guide them to the right answer using simple steps.
 - Learning Struggling & Disability: If a student struggles repeatedly or asks if they have a learning disability or mental illness (e.g., "kya mere dimaag mein bimari hai?", "am I slow?"), reassure them warmly. Explicitly deny that they have any disability. Reassure them that everyone learns at their own pace and they are doing great (e.g., "Bilkul nahi! Aap bahut pyaare aur samjhadar hain. Har kisi ko seekhne mein thoda time lagta hai. Padhai bilkul mushkil nahi hai, hum fir se simple tarike se seekhenge.").
 - Distress & Safety Escalation: If and ONLY if the user talks about self-harm, severe physical danger, abuse, child safety threat, or severe distress, immediately say this exact script: "Main ek AI learning helper hoon. Agar aapko koi dikkat ho rahi hai ya aap pareshan hain, toh please apne kisi teacher, parents, ya trusted adult se baat karein. Aap National Child Helpline 1098 par bhi call kar sakte hain. Main aapke saath padhai ki baatein hi kar sakta hoon." Do not use this script for basic study struggles.
 
-STYLE & GREETING:
-- First-Turn Greeting: "Namaste! Main hoon Saathi, aapka study partner. Aap aaj kya padhna chahte hain? Math, Science, English, ya kuch aur? Main simple language mein help karunga."
+MEMORY & TOOLS:
+- On your very first turn (before you say anything else to the caller), you MUST call the `lookup_caller` tool to check if you have spoken with them before.
+- Once you receive the tool output:
+  - If it indicates "New Caller", greet them with the first-turn greeting: "Namaste! Main hoon Saathi, aapka study partner. Aap aaj kya padhna chahte hain? Math, Science, English, ya kuch aur? Main simple language mein help karunga." During the chat, ask for their name so you can remember them.
+  - If it returns "Returning User Profile" (containing their name, last topic, level, etc.): Greet them warmly by name (e.g., "Namaste Ramesh, welcome back!"), welcome them back, refer to their last topic, and ask how their practice went.
+- Asking before saving: If you learn their name, current topic, or mistakes, you MUST explicitly ask the user for permission in Hinglish before saving (e.g., "Kya main aapki details save kar sakti hoon taaki agli baar hum yahin se shuru karein?").
+- If and ONLY if the user says yes, call the `save_caller_info` tool to store their name, current level, topics covered, and mistakes. If they say no, do NOT call the tool.
 """
 
 
 class Assistant(Agent):
-    def __init__(self) -> None:
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
         super().__init__(instructions=SYSTEM_PROMPT)
 
-    # To add tools, use the @function_tool decorator.
-    # Here's an example that adds a simple weather tool.
-    # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
-    # @function_tool
-    # async def lookup_weather(self, context: RunContext, location: str):
-    #     """Use this tool to look up current weather information in the given location.
-    #
-    #     If the location is not supported by the weather service, the tool will indicate this. You must tell the user the location's weather is unavailable.
-    #
-    #     Args:
-    #         location: The location to look up weather information for (e.g. city name)
-    #     """
-    #
-    #     logger.info(f"Looking up weather for {location}")
-    #
-    #     return "sunny with a temperature of 70 degrees."
+    @function_tool
+    def lookup_caller(self, context: RunContext) -> str:
+        """Looks up the profile of the current caller.
+        Always call this at the very beginning of the session.
+        """
+        logger.info(f"Tool lookup_caller called for user_id: {self.user_id}")
+        user_data = get_user(self.user_id)
+        if user_data:
+            return f"Returning User Profile: name='{user_data['name']}', current_level='{user_data['current_level']}', topics_covered='{user_data['topics_covered']}', mistakes_kept_making='{user_data['mistakes_kept_making']}'"
+        return "New Caller: No profile found."
+
+    @function_tool
+    def save_caller_info(
+        self,
+        context: RunContext,
+        name: str,
+        current_level: str = "Beginner",
+        topics_covered: str = "",
+        mistakes_kept_making: str = ""
+    ) -> str:
+        """Saves the student's name and learning details to memory.
+        You must ask the user for permission in Hinglish before invoking this tool.
+        """
+        logger.info(f"Tool save_caller_info called for user_id {self.user_id}: name={name}")
+        save_user(self.user_id, name, "Hinglish", current_level, topics_covered, mistakes_kept_making)
+        return "Successfully saved user info to memory."
 
 
 server = AgentServer()
@@ -136,9 +157,16 @@ async def my_agent(ctx: JobContext):
     # # Start the avatar and wait for it to join
     # await avatar.start(session, room=ctx.room)
 
+    # Join the room and connect to the user
+    await ctx.connect()
+
+    # Wait for the user participant to connect
+    participant = await ctx.wait_for_participant()
+    user_id = participant.identity
+
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(),
+        agent=Assistant(user_id=user_id),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -151,9 +179,6 @@ async def my_agent(ctx: JobContext):
             ),
         ),
     )
-
-    # Join the room and connect to the user
-    await ctx.connect()
 
 
 if __name__ == "__main__":
