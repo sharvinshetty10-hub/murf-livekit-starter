@@ -43,9 +43,37 @@ if sys.platform == "win32":
     sys.stdout = SafeStream(sys.stdout)
     sys.stderr = SafeStream(sys.stderr)
 
-# Suppress verbose debug log outputs
-logging.getLogger("livekit").setLevel(logging.INFO)
-logging.getLogger("livekit.plugins").setLevel(logging.INFO)
+# Custom logging filter to convert Devanagari/Hindi Unicode characters to ASCII-safe placeholders
+# in log records. This prevents console handlers from raising UnicodeEncodeError on Windows.
+class SafeLoggingFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            if isinstance(record.msg, str):
+                record.msg = record.msg.encode("ascii", errors="replace").decode("ascii")
+            if record.args:
+                new_args = []
+                for arg in record.args:
+                    if isinstance(arg, str):
+                        new_args.append(arg.encode("ascii", errors="replace").decode("ascii"))
+                    elif isinstance(arg, dict):
+                        import json
+                        try:
+                            str_repr = json.dumps(arg, ensure_ascii=True)
+                            new_args.append(json.loads(str_repr))
+                        except Exception:
+                            new_args.append(arg)
+                    else:
+                        new_args.append(arg)
+                record.args = tuple(new_args)
+        except Exception:
+            pass
+        return True
+
+# Register the logging filter
+logging_filter = SafeLoggingFilter()
+logging.getLogger().addFilter(logging_filter)
+logging.getLogger("livekit").addFilter(logging_filter)
+logging.getLogger("livekit.plugins").addFilter(logging_filter)
 
 import html
 from dotenv import load_dotenv
