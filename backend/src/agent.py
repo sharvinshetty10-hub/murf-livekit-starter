@@ -47,6 +47,7 @@ if sys.platform == "win32":
 logging.getLogger("livekit").setLevel(logging.INFO)
 logging.getLogger("livekit.plugins").setLevel(logging.INFO)
 
+import html
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents import (
@@ -105,6 +106,9 @@ MEMORY & TOOLS:
   - If it returns "Returning User Profile" (containing their name, last topic, level, etc.): Greet them warmly by name (e.g., "Namaste Ramesh, welcome back!"), welcome them back, refer to their last topic, and ask how their practice went.
 - Asking before saving: If you learn their name, current topic, or mistakes, you MUST explicitly ask the user for permission in Hinglish before saving (e.g., "Kya main aapki details save kar sakti hoon taaki agli baar hum yahin se shuru karein?").
 - If and ONLY if the user says yes, call the `save_caller_info` tool to store their name, current level, topics covered, and mistakes. If they say no, do NOT call the tool.
+- Word Lookup: If the student asks for the meaning, definition, or translation of an English word (e.g., "celebrate ka kya matlab hai?"), call the `lookup_word_definition` tool. Once you get the definition, explain it to the student in simple Hinglish, provide a relatable example, and mention the timestamp out loud (e.g., "Main live dekh rahi hoon as of today...").
+- Quiz Game: If the student wants to play a game, solve a quiz, or answer questions (e.g., "Chalo ek game khelein" or "Mujhe questions poochho"), call the `fetch_quiz_question` tool. Present the question and the multiple choice options clearly in Hinglish. Tell the student when the quiz question was fetched, check their answer, and provide positive feedback.
+- Failure Handling Out Loud: If any API tool fails or times out (returns an "Error:" prefix), explain this politely to the caller in Hinglish (e.g., "Sorry, server abhi busy hai. Main general knowledge se hi ek sawaal poochhti hoon...") instead of going silent or hallucinating.
 """
 
 
@@ -139,6 +143,86 @@ class Assistant(Agent):
         logger.info(f"Tool save_caller_info called for user_id {self.user_id}: name={name}")
         save_user(self.user_id, name, "Hinglish", current_level, topics_covered, mistakes_kept_making)
         return "Successfully saved user info to memory."
+
+    @function_tool
+    async def lookup_word_definition(self, context: RunContext, word: str) -> str:
+        """Fetches the definition, part of speech, and an example sentence of an English word.
+        Call this tool when the user asks for the meaning, definition, or explanation of a specific English word.
+        
+        Args:
+            word: The English word to define (e.g. 'celebrate', 'gravity').
+        """
+        import urllib.request
+        import json
+        import urllib.parse
+        from datetime import datetime
+
+        logger.info(f"Looking up word definition for: '{word}'")
+        url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{urllib.parse.quote(word)}"
+        timestamp = datetime.now().strftime("%d %b %Y, %I:%M %p")
+
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            # 3 second timeout for quick response
+            with urllib.request.urlopen(req, timeout=3) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                meanings = data[0]['meanings']
+                part_of_speech = meanings[0]['partOfSpeech']
+                definition = meanings[0]['definitions'][0]['definition']
+                
+                # Try to get an example sentence
+                example = meanings[0]['definitions'][0].get('example', '')
+                example_str = f" Example sentence: '{example}'." if example else ""
+                
+                return f"Word: '{word}' [{part_of_speech}]. Definition: {definition}.{example_str} (Fetched live as of {timestamp})"
+        except urllib.error.HTTPError as he:
+            if he.code == 404:
+                return f"Error: The word '{word}' was not found in the dictionary. (Checked live as of {timestamp})"
+            return f"Error: Failed to reach dictionary server (HTTP {he.code}). Please try again later. (Checked live as of {timestamp})"
+        except Exception as e:
+            logger.error(f"Error in lookup_word_definition: {e}")
+            return f"Error: Dictionary lookup timed out or failed. Please check your internet connection. (Checked live as of {timestamp})"
+
+    @function_tool
+    async def fetch_quiz_question(self, context: RunContext) -> str:
+        """Fetches a random primary-school level trivia question (General Knowledge / Science) with multiple choice options.
+        Call this tool when the student says they want to play a game, solve a quiz, answer a question, or practice.
+        """
+        import urllib.request
+        import json
+        from datetime import datetime
+        import html
+
+        logger.info("Fetching quiz question...")
+        url = "https://opentdb.com/api.php?amount=1&category=9&difficulty=easy&type=multiple"
+        timestamp = datetime.now().strftime("%d %b %Y, %I:%M %p")
+
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            # 3 second timeout
+            with urllib.request.urlopen(req, timeout=3) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                if data['response_code'] == 0:
+                    result = data['results'][0]
+                    # Decode HTML entities in text
+                    question = html.unescape(result['question'])
+                    correct_answer = html.unescape(result['correct_answer'])
+                    incorrect_answers = [html.unescape(ans) for ans in result['incorrect_answers']]
+                    
+                    options = incorrect_answers + [correct_answer]
+                    import random
+                    random.shuffle(options)
+                    
+                    return json.dumps({
+                        "question": question,
+                        "options": options,
+                        "correct_answer": correct_answer,
+                        "timestamp": f"Fetched live as of {timestamp}"
+                    })
+                return f"Error: Quiz server returned code {data['response_code']}. Please try again. (Checked as of {timestamp})"
+        except Exception as e:
+            logger.error(f"Error in fetch_quiz_question: {e}")
+            return f"Error: Quiz server timed out or is temporarily unavailable. Please try again in a moment. (Checked as of {timestamp})"
 
 
 server = AgentServer()
