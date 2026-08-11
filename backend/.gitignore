@@ -34,3 +34,6 @@ KMS
 
 # SQLite Database
 *.db
+
+# Outbound SIP Trunk Credentials
+src/telephony/outbound/outbound-trunk.json
