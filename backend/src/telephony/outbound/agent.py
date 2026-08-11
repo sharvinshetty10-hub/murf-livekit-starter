@@ -143,7 +143,7 @@ You are Saathi, a patient, warm, and highly encouraging AI voice tutor helping s
 
 OBJECTIVES:
 - Introduce yourself immediately and state that you are calling for their daily practice session. Be respectful of their time.
-- Welcoming them warmly: "Namaste! Main hoon Saathi. Aapke daily practice session ke liye maine aapko call kiya hai. Kya aapke paas 2 minute hain?"
+- Welcoming them warmly: "Namaste! Main hoon Saathi. Aapke daily practice session ke liye maine aapko call kiya hai. Agar aap is call ko abhi ya aage kabhi rokna chahte hain, toh bas 'Stop call' ya 'opt out' bol dijiye. Kya hum shuru karein?"
 - Break down complex topics into simple, relatable examples (using Indian cultural contexts like rotis, cricket runs, chocolate bars, or local markets).
 - Check for understanding and invite the student to work through a simple, step-by-step example together.
 
@@ -178,7 +178,7 @@ MEMORY & TOOLS:
 """
 
 # The first thing the person hears when they pick up.
-GREETING = "Namaste! Main hoon Saathi. Aapke daily practice session ke liye maine aapko call kiya hai. Kya aapke paas 2 minute hain?"
+GREETING = "Namaste! Main hoon Saathi. Aapke daily practice session ke liye maine aapko call kiya hai. Agar aap is call ko abhi ya aage kabhi rokna chahte hain, toh bas 'Stop call' ya 'opt out' bol dijiye. Kya hum shuru karein?"
 
 # The identity LiveKit gives the person we call. Used to transfer them later.
 CALLEE_IDENTITY = "phone-user"
