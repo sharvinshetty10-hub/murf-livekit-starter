@@ -45,10 +45,11 @@ export async function POST(req: Request) {
     }
     const url = new URL(req.url);
     const queryUserId = url.searchParams.get('userId');
-      
+
     // Generate participant token
     const participantName = 'user';
-    const participantIdentity = queryUserId || `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
+    const participantIdentity =
+      queryUserId || `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
     const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
 
     const participantToken = await createParticipantToken(

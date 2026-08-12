@@ -9,7 +9,7 @@ function SparklesIcon() {
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className="size-5 text-teal-500 animate-pulse"
+      className="size-5 animate-pulse text-teal-500"
     >
       <path
         strokeLinecap="round"
@@ -54,24 +54,23 @@ export const WelcomeView = ({
   };
 
   return (
-    <div ref={ref} className="relative w-full max-w-4xl px-4 py-8 mx-auto">
+    <div ref={ref} className="relative mx-auto w-full max-w-4xl px-4 py-8">
       {/* Background soft glowing blur elements */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-teal-500/10 dark:bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-80 h-80 bg-orange-500/5 dark:bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="pointer-events-none absolute top-1/4 left-1/4 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-500/10 blur-3xl dark:bg-teal-500/10" />
+      <div className="pointer-events-none absolute right-1/4 bottom-1/4 h-80 w-80 translate-x-1/2 translate-y-1/2 rounded-full bg-orange-500/5 blur-3xl dark:bg-orange-500/10" />
 
       {/* Main Glassmorphic Card Container */}
-      <section className="relative overflow-hidden backdrop-blur-xl bg-white/40 dark:bg-black/35 border border-white/20 dark:border-white/5 rounded-3xl p-8 md:p-12 shadow-2xl flex flex-col items-center justify-center text-center max-w-2xl mx-auto">
-        
+      <section className="relative mx-auto flex max-w-2xl flex-col items-center justify-center overflow-hidden rounded-3xl border border-white/20 bg-white/40 p-8 text-center shadow-2xl backdrop-blur-xl md:p-12 dark:border-white/5 dark:bg-black/35">
         {/* Voice for Bharat Indian Flag Gradient Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-linear-to-r from-orange-500/10 via-white/10 to-emerald-500/10 border border-orange-500/20 dark:border-emerald-500/20 text-xs font-semibold tracking-wide text-orange-600 dark:text-emerald-400 mb-6 uppercase shadow-xs">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-orange-500/20 bg-linear-to-r from-orange-500/10 via-white/10 to-emerald-500/10 px-3 py-1 text-xs font-semibold tracking-wide text-orange-600 uppercase shadow-xs dark:border-emerald-500/20 dark:text-emerald-400">
+          <span className="flex h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
           🇮🇳 Voice for Bharat Edition
         </div>
 
         {/* Pulsing Glowing AI Orb Avatar Representation */}
         <div className="relative mb-6 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-teal-500/20 dark:bg-teal-400/20 blur-xl animate-pulse scale-125" />
-          <div className="relative w-20 h-20 rounded-full bg-linear-to-tr from-teal-600 to-teal-400 dark:from-teal-500 dark:to-teal-300 flex items-center justify-center shadow-lg shadow-teal-500/20">
+          <div className="absolute inset-0 scale-125 animate-pulse rounded-full bg-teal-500/20 blur-xl dark:bg-teal-400/20" />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-tr from-teal-600 to-teal-400 shadow-lg shadow-teal-500/20 dark:from-teal-500 dark:to-teal-300">
             <svg
               width="36"
               height="36"
@@ -89,40 +88,45 @@ export const WelcomeView = ({
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground bg-linear-to-b from-foreground to-foreground/80 bg-clip-text">
-          Meet <span className="text-teal-600 dark:text-teal-400 font-black">Saathi</span>
+        <h1 className="text-foreground from-foreground to-foreground/80 bg-linear-to-b bg-clip-text text-3xl font-extrabold tracking-tight md:text-4xl">
+          Meet <span className="font-black text-teal-600 dark:text-teal-400">Saathi</span>
         </h1>
 
         {/* Description */}
-        <p className="text-muted-foreground max-w-md mt-3 text-sm md:text-base leading-relaxed">
-          A patient, encouraging voice tutor designed for grassroots students in India. Speak naturally and get instant answers for your studies.
+        <p className="text-muted-foreground mt-3 max-w-md text-sm leading-relaxed md:text-base">
+          A patient, encouraging voice tutor designed for grassroots students in India. Speak
+          naturally and get instant answers for your studies.
         </p>
 
         {/* Suggested Topics Card Grid */}
-        <div className="grid grid-cols-2 gap-3 w-full max-w-md mt-8 text-left">
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-white/20 dark:bg-white/5 border border-white/10 text-xs text-foreground/95 hover:bg-white/30 dark:hover:bg-white/10 transition-colors cursor-pointer">
-            <span className="p-1 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400">📝</span>
+        <div className="mt-8 grid w-full max-w-md grid-cols-2 gap-3 text-left">
+          <div className="text-foreground/95 flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/20 p-3 text-xs transition-colors hover:bg-white/30 dark:bg-white/5 dark:hover:bg-white/10">
+            <span className="rounded-md bg-teal-500/10 p-1 text-teal-600 dark:text-teal-400">
+              📝
+            </span>
             <div>
               <p className="font-semibold">Grammar</p>
-              <p className="text-[10px] text-muted-foreground">A vs An / Sentence structure</p>
+              <p className="text-muted-foreground text-[10px]">A vs An / Sentence structure</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-white/20 dark:bg-white/5 border border-white/10 text-xs text-foreground/95 hover:bg-white/30 dark:hover:bg-white/10 transition-colors cursor-pointer">
-            <span className="p-1 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400">🔬</span>
+          <div className="text-foreground/95 flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/20 p-3 text-xs transition-colors hover:bg-white/30 dark:bg-white/5 dark:hover:bg-white/10">
+            <span className="rounded-md bg-orange-500/10 p-1 text-orange-600 dark:text-orange-400">
+              🔬
+            </span>
             <div>
               <p className="font-semibold">Science</p>
-              <p className="text-[10px] text-muted-foreground">Why is the sky blue?</p>
+              <p className="text-muted-foreground text-[10px]">Why is the sky blue?</p>
             </div>
           </div>
         </div>
 
         {/* Action Button */}
-        <div className="relative group w-full max-w-xs mt-8">
-          <div className="absolute inset-0 bg-teal-500/25 rounded-full blur-md opacity-75 group-hover:opacity-100 transition-opacity animate-pulse pointer-events-none" />
+        <div className="group relative mt-8 w-full max-w-xs">
+          <div className="pointer-events-none absolute inset-0 animate-pulse rounded-full bg-teal-500/25 opacity-75 blur-md transition-opacity group-hover:opacity-100" />
           <Button
             size="lg"
             onClick={handleStartCall}
-            className="relative w-full h-12 rounded-full bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 text-white font-bold tracking-wide transition-all shadow-lg hover:shadow-teal-500/20 active:scale-98 flex items-center justify-center gap-2 text-sm"
+            className="relative flex h-12 w-full items-center justify-center gap-2 rounded-full bg-teal-600 text-sm font-bold tracking-wide text-white shadow-lg transition-all hover:bg-teal-700 hover:shadow-teal-500/20 active:scale-98 dark:bg-teal-500 dark:hover:bg-teal-600"
           >
             <SparklesIcon />
             {startButtonText}
@@ -131,32 +135,40 @@ export const WelcomeView = ({
 
         {/* Microphone Blocked Error Modal */}
         {micError && (
-          <div className="mt-6 w-full max-w-md p-5 border border-red-500/25 bg-red-500/5 dark:bg-red-950/15 rounded-2xl text-left backdrop-blur-md animate-fade-in">
+          <div className="animate-fade-in mt-6 w-full max-w-md rounded-2xl border border-red-500/25 bg-red-500/5 p-5 text-left backdrop-blur-md dark:bg-red-950/15">
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
               <div>
-                <h4 className="font-bold text-red-600 dark:text-red-400 text-sm">Microphone Blocked</h4>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                <h4 className="text-sm font-bold text-red-600 dark:text-red-400">
+                  Microphone Blocked
+                </h4>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
                   Saathi needs microphone permission to hear your questions.
                 </p>
-                <ol className="list-decimal pl-4 mt-2 text-[11px] text-muted-foreground space-y-1">
-                  <li>Click the <strong>Lock / Site Settings</strong> icon in your browser's address bar.</li>
-                  <li>Change the <strong>Microphone</strong> setting to <strong>Allow</strong>.</li>
+                <ol className="text-muted-foreground mt-2 list-decimal space-y-1 pl-4 text-[11px]">
+                  <li>
+                    Click the <strong>Lock / Site Settings</strong> icon in your browser's address
+                    bar.
+                  </li>
+                  <li>
+                    Change the <strong>Microphone</strong> setting to <strong>Allow</strong>.
+                  </li>
                   <li>Refresh this page and click start again!</li>
                 </ol>
               </div>
             </div>
           </div>
         )}
-
       </section>
 
       {/* Footer Info */}
-      <div className="mt-8 flex flex-col items-center justify-center text-center gap-1">
+      <div className="mt-8 flex flex-col items-center justify-center gap-1 text-center">
         <p className="text-muted-foreground text-[11px] md:text-xs">
-          Powered by <strong className="text-foreground/90">Murf Falcon</strong> (TTS) &amp; <strong className="text-foreground/90">Gemini 3.5</strong> (LLM) over <strong className="text-foreground/90">LiveKit</strong>
+          Powered by <strong className="text-foreground/90">Murf Falcon</strong> (TTS) &amp;{' '}
+          <strong className="text-foreground/90">Gemini 3.5</strong> (LLM) over{' '}
+          <strong className="text-foreground/90">LiveKit</strong>
         </p>
-        <p className="text-[10px] text-muted-foreground/60 max-w-xs">
+        <p className="text-muted-foreground/60 max-w-xs text-[10px]">
           Built for the Day 3 challenge of 10 Days of AI Voice Agents.
         </p>
       </div>

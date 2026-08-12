@@ -4,10 +4,10 @@ import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import {
   type TrackReference,
   VideoTrack,
+  useAgent,
   useLocalParticipant,
   useTracks,
   useVoiceAssistant,
-  useAgent,
 } from '@livekit/components-react';
 import { cn } from '@/lib/shadcn/utils';
 import { AudioVisualizer } from './audio-visualizer';
@@ -111,28 +111,28 @@ export function TileLayout({
     switch (agentState) {
       case 'listening':
         return (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-pulse shadow-xs">
+          <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-bold text-emerald-600 shadow-xs dark:text-emerald-400">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             🎤 Listening to you...
           </div>
         );
       case 'thinking':
         return (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-xs font-bold text-orange-600 dark:text-orange-400 animate-pulse shadow-xs">
-            <span className="h-2 w-2 rounded-full bg-orange-500 animate-bounce" />
+          <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 text-xs font-bold text-orange-600 shadow-xs dark:text-orange-400">
+            <span className="h-2 w-2 animate-bounce rounded-full bg-orange-500" />
             🤔 Saathi is thinking...
           </div>
         );
       case 'speaking':
         return (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs font-bold text-teal-600 dark:text-teal-400 animate-pulse shadow-xs">
-            <span className="h-2 w-2 rounded-full bg-teal-500 animate-ping" />
+          <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-4 py-1.5 text-xs font-bold text-teal-600 shadow-xs dark:text-teal-400">
+            <span className="h-2 w-2 animate-ping rounded-full bg-teal-500" />
             🔊 Saathi is speaking...
           </div>
         );
       default:
         return (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-xs font-bold text-gray-500 dark:text-gray-400 shadow-xs">
+          <div className="inline-flex items-center gap-2 rounded-full border border-gray-500/30 bg-gray-500/10 px-4 py-1.5 text-xs font-bold text-gray-500 shadow-xs dark:text-gray-400">
             💤 Connecting...
           </div>
         );
@@ -140,13 +140,11 @@ export function TileLayout({
   };
 
   return (
-    <div className="absolute inset-x-0 top-8 bottom-32 z-50 md:top-12 md:bottom-40 flex flex-col items-center">
+    <div className="absolute inset-x-0 top-8 bottom-32 z-50 flex flex-col items-center md:top-12 md:bottom-40">
       {/* Active speaker / listener status badge */}
-      <div className="h-10 mb-6 flex items-center justify-center">
-        {renderStatusBadge()}
-      </div>
+      <div className="mb-6 flex h-10 items-center justify-center">{renderStatusBadge()}</div>
 
-      <div className="relative mx-auto h-full max-w-2xl px-4 md:px-0 w-full flex-1">
+      <div className="relative mx-auto h-full w-full max-w-2xl flex-1 px-4 md:px-0">
         <div className={cn(tileViewClassNames.grid)}>
           {/* Agent */}
           <div

@@ -35,7 +35,8 @@ export interface AppConfig {
 export const APP_CONFIG_DEFAULTS: AppConfig = {
   companyName: 'Saathi AI',
   pageTitle: 'Saathi — AI Voice Tutor',
-  pageDescription: 'A patient, warm AI voice tutor for students in India. Powered by Murf Falcon and Gemini.',
+  pageDescription:
+    'A patient, warm AI voice tutor for students in India. Powered by Murf Falcon and Gemini.',
 
   supportsChatInput: true,
   supportsVideoInput: true,

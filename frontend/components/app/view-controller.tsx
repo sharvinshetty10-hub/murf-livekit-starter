@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSessionContext } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
 import { AgentSessionView_01 } from '@/components/agents-ui/blocks/agent-session-view-01';
-import { WelcomeView } from '@/components/app/welcome-view';
-import { ConnectingView } from '@/components/app/connecting-view';
 import { CallEndedView } from '@/components/app/call-ended-view';
+import { ConnectingView } from '@/components/app/connecting-view';
+import { WelcomeView } from '@/components/app/welcome-view';
 
 const MotionWelcomeView = motion.create(WelcomeView);
 const MotionConnectingView = motion.create(ConnectingView);
@@ -72,20 +72,12 @@ export function ViewController({ appConfig }: ViewControllerProps) {
 
       {/* Connecting State - Connecting View */}
       {connectionState === 'connecting' && (
-        <MotionConnectingView
-          key="connecting"
-          {...VIEW_MOTION_PROPS}
-          onCancel={handleCancel}
-        />
+        <MotionConnectingView key="connecting" {...VIEW_MOTION_PROPS} onCancel={handleCancel} />
       )}
 
       {/* Call Ended State - Call Ended View */}
       {connectionState === 'disconnected' && hasCallConnected && (
-        <MotionCallEndedView
-          key="call-ended"
-          {...VIEW_MOTION_PROPS}
-          onRestart={handleRestart}
-        />
+        <MotionCallEndedView key="call-ended" {...VIEW_MOTION_PROPS} onRestart={handleRestart} />
       )}
 
       {/* Connected State - Active Session View */}
