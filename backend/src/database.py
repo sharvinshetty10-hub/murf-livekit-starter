@@ -23,6 +23,19 @@ def init_db():
             last_interaction TEXT
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS escalations (
+            ticket_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            name TEXT,
+            reason TEXT,
+            topics_covered TEXT,
+            urgency TEXT,
+            follow_up_method TEXT,
+            status TEXT,
+            timestamp TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -53,3 +66,25 @@ def save_user(user_id: str, name: str, language_preference: str = "Hinglish", cu
     """, (user_id, name, language_preference, current_level, topics_covered, mistakes_kept_making, last_interaction))
     conn.commit()
     conn.close()
+
+def create_ticket(user_id: str, name: str, reason: str, topics_covered: str, urgency: str, follow_up_method: str) -> str:
+    import random
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    ticket_id = f"TKT-{random.randint(1000, 9999)}"
+    timestamp = datetime.now().isoformat()
+    cursor.execute("""
+        INSERT INTO escalations (ticket_id, user_id, name, reason, topics_covered, urgency, follow_up_method, status, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (ticket_id, user_id, name, reason, topics_covered, urgency, follow_up_method, "Open", timestamp))
+    conn.commit()
+    conn.close()
+    return ticket_id
+
+def get_all_tickets():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM escalations ORDER BY timestamp DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

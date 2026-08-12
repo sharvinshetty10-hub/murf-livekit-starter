@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Outbound telephony agent — places calls and talks to whoever answers.
 
 Unlike the inbound agent, this one does the dialling. It waits to be dispatched
@@ -102,9 +103,9 @@ logging.getLogger("livekit.plugins").addFilter(logging_filter)
 
 # Add src/ to sys.path so we can import database.py safely
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from dotenv import load_dotenv  # noqa: E402
-from livekit import api, rtc  # noqa: E402
-from livekit.agents import (  # noqa: E402
+from dotenv import load_dotenv
+from livekit import api, rtc
+from livekit.agents import (
     Agent,
     AgentServer,
     AgentSession,
@@ -116,16 +117,16 @@ from livekit.agents import (  # noqa: E402
     room_io,
     tokenize,
 )
-from livekit.plugins import (  # noqa: E402
+from livekit.plugins import (
     deepgram,
     google,
     murf,
     noise_cancellation,
     silero,
 )
-from livekit.plugins.turn_detector.multilingual import MultilingualModel  # noqa: E402
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from database import get_user, init_db, save_user  # noqa: E402
+from database import get_user, init_db, save_user
 
 logger = logging.getLogger("outbound-agent")
 
@@ -175,6 +176,7 @@ MEMORY & TOOLS:
 - Quiz Game: If they want to play a game or answer questions, call the `fetch_quiz_question` tool. Present the question and choices in Devanagari Hinglish.
 - Failure Handling Out Loud: If any API tool fails or times out (returns an "Error:" prefix), explain this politely to the caller in Hinglish instead of going silent.
 - If the person asks for a human, use the transfer_to_human tool. If you reach a voicemail, use the detected_answering_machine tool. When the call is finished, use the end_call tool.
+- Human Handoff / Teacher Escalation: If the student is repeatedly struggling, sounds highly frustrated, or specifically asks to connect with a teacher or human, you MUST ask for their permission in Hinglish before sharing their details (e.g., "Kya main aapki details aur aap kis topic mein struggle kar rahe hain, apne teacher ko send kar sakti hoon taaki wo aapki help karein?"). If they say yes, invoke `create_escalation` with a short summary of their reason, the urgency (default is 'Medium' or 'High' if they are very upset), and the follow-up method ('Phone Call'). Read out the reference Ticket ID clearly and explain that a teacher will follow up with them. If they say no, do NOT call the tool; respect their privacy and try to reassure them.
 """
 
 # The first thing the person hears when they pick up.
@@ -309,6 +311,98 @@ class OutboundAgent(Agent):
         except Exception as e:
             logger.error(f"Error in fetch_quiz_question: {e}")
             return f"Error: Quiz server timed out or is temporarily unavailable. Please try again in a moment. (Checked as of {timestamp})"
+
+    @function_tool
+    async def create_escalation(
+        self,
+        context: RunContext,
+        reason: str,
+        urgency: str = "Medium",
+        follow_up_method: str = "Phone Call",
+    ) -> str:
+        """Create a human help request / ticket when the student is repeatedly struggling,
+        needs a real teacher's help, or is frustrated.
+
+        Before invoking this tool, you MUST explicitly ask the student for permission in Hinglish.
+
+        Args:
+            reason: The topic/reason why the student needs help (e.g. 'Struggling with Division').
+            urgency: How urgent this request is ('Low', 'Medium', 'High'). Default is 'Medium'.
+            follow_up_method: How the teacher should follow up (e.g. 'Phone Call').
+        """
+        import json
+        import os
+        import urllib.request
+        from datetime import datetime
+
+        from database import create_ticket, get_user
+
+        logger.info(
+            f"Tool create_escalation called for user_id {self.user_id}: reason={reason}"
+        )
+
+        # Look up student's details
+        name = "Unknown Student"
+        topics_covered = ""
+        user_data = get_user(self.user_id)
+        if user_data:
+            name = user_data.get("name", "Unknown Student")
+            topics_covered = user_data.get("topics_covered", "")
+
+        # Create ticket in local database
+        ticket_id = create_ticket(
+            self.user_id, name, reason, topics_covered, urgency, follow_up_method
+        )
+
+        # Discord Webhook Notification
+        webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+        if webhook_url:
+            embed_color = (
+                16711680
+                if urgency.lower() == "high"
+                else (16776960 if urgency.lower() == "medium" else 65280)
+            )
+            payload = {
+                "embeds": [
+                    {
+                        "title": "🚨 Human Escalation Triggered!",
+                        "color": embed_color,
+                        "fields": [
+                            {"name": "Ticket ID", "value": ticket_id, "inline": True},
+                            {"name": "Student Name", "value": name, "inline": True},
+                            {"name": "Urgency", "value": urgency, "inline": True},
+                            {"name": "Reason for Help", "value": reason},
+                            {
+                                "name": "Topics Covered",
+                                "value": topics_covered or "None",
+                            },
+                            {
+                                "name": "Follow-up Method",
+                                "value": follow_up_method,
+                                "inline": True,
+                            },
+                        ],
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ]
+            }
+            try:
+                req = urllib.request.Request(
+                    webhook_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "User-Agent": "Mozilla/5.0",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=3) as res:
+                    logger.info(
+                        f"Escalation successfully posted to Discord! Status: {res.status}"
+                    )
+            except Exception as ex:
+                logger.error(f"Failed to post escalation to Discord webhook: {ex}")
+
+        return f"Escalation ticket created successfully. Reference Ticket ID is '{ticket_id}'."
 
     @function_tool
     async def transfer_to_human(self, context: RunContext) -> str:

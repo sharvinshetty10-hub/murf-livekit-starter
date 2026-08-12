@@ -1,8 +1,11 @@
+# ruff: noqa: E402
+import contextlib
 import logging
 import sys
 
 # Windows Unicode Terminal Encoding Safeguard to prevent UnicodeEncodeError in logs/console prints
 if sys.platform == "win32":
+
     class SafeStream:
         def __init__(self, original_stream):
             self.original_stream = original_stream
@@ -13,10 +16,8 @@ if sys.platform == "win32":
 
         def write(self, data):
             if isinstance(data, bytes):
-                try:
+                with contextlib.suppress(Exception):
                     data = data.decode("utf-8", errors="replace")
-                except Exception:
-                    pass
             try:
                 self.original_stream.write(data)
             except UnicodeEncodeError:
@@ -30,10 +31,8 @@ if sys.platform == "win32":
                 pass
 
         def flush(self):
-            try:
+            with contextlib.suppress(Exception):
                 self.original_stream.flush()
-            except Exception:
-                pass
 
         def __getattr__(self, name):
             if name == "encoding":
@@ -43,20 +42,26 @@ if sys.platform == "win32":
     sys.stdout = SafeStream(sys.stdout)
     sys.stderr = SafeStream(sys.stderr)
 
+
 # Custom logging filter to convert Devanagari/Hindi Unicode characters to ASCII-safe placeholders
 # in log records. This prevents console handlers from raising UnicodeEncodeError on Windows.
 class SafeLoggingFilter(logging.Filter):
     def filter(self, record):
         try:
             if isinstance(record.msg, str):
-                record.msg = record.msg.encode("ascii", errors="replace").decode("ascii")
+                record.msg = record.msg.encode("ascii", errors="replace").decode(
+                    "ascii"
+                )
             if record.args:
                 new_args = []
                 for arg in record.args:
                     if isinstance(arg, str):
-                        new_args.append(arg.encode("ascii", errors="replace").decode("ascii"))
+                        new_args.append(
+                            arg.encode("ascii", errors="replace").decode("ascii")
+                        )
                     elif isinstance(arg, dict):
                         import json
+
                         try:
                             str_repr = json.dumps(arg, ensure_ascii=True)
                             new_args.append(json.loads(str_repr))
@@ -69,6 +74,7 @@ class SafeLoggingFilter(logging.Filter):
             pass
         return True
 
+
 # Register the logging filter
 logging_filter = SafeLoggingFilter()
 logging.getLogger().addFilter(logging_filter)
@@ -76,6 +82,7 @@ logging.getLogger("livekit").addFilter(logging_filter)
 logging.getLogger("livekit.plugins").addFilter(logging_filter)
 
 import html
+
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents import (
@@ -84,22 +91,70 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
-    cli,
-    inference,
-    tokenize,
-    room_io,
-    function_tool,
     RunContext,
+    cli,
+    function_tool,
+    room_io,
+    tokenize,
 )
-from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
+from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from database import init_db, get_user, save_user
+from database import get_user, init_db, save_user
 
 logger = logging.getLogger("agent")
 
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+class EscalationsHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args, **kwargs):
+        # Suppress standard logging to keep the terminal logs clean
+        pass
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def do_GET(self):
+        if self.path == "/escalations":
+            from database import get_all_tickets
+
+            try:
+                tickets = get_all_tickets()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(tickets).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(str(e).encode("utf-8"))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+
+def start_http_server():
+    def run():
+        server_address = ("", 8383)
+        httpd = HTTPServer(server_address, EscalationsHandler)
+        logger.info("Custom HTTP Escalation Server listening on port 8383...")
+        httpd.serve_forever()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+
 load_dotenv(".env.local")
 init_db()
+start_http_server()
 
 SYSTEM_PROMPT = """IDENTITY:
 You are Saathi, a patient, warm, and highly encouraging AI voice tutor helping school students in India with their studies, particularly first-generation learners in under-resourced areas.
@@ -137,6 +192,7 @@ MEMORY & TOOLS:
 - Word Lookup: If the student asks for the meaning, definition, or translation of an English word (e.g., "celebrate ka kya matlab hai?"), call the `lookup_word_definition` tool. Once you get the definition, explain it to the student in simple Hinglish, provide a relatable example, and mention the timestamp out loud (e.g., "Main live dekh rahi hoon as of today...").
 - Quiz Game: If the student wants to play a game, solve a quiz, or answer questions (e.g., "Chalo ek game khelein" or "Mujhe questions poochho"), call the `fetch_quiz_question` tool. Present the question and the multiple choice options clearly in Hinglish. Tell the student when the quiz question was fetched, check their answer, and provide positive feedback.
 - Failure Handling Out Loud: If any API tool fails or times out (returns an "Error:" prefix), explain this politely to the caller in Hinglish (e.g., "Sorry, server abhi busy hai. Main general knowledge se hi ek sawaal poochhti hoon...") instead of going silent or hallucinating.
+- Human Handoff / Teacher Escalation: If the student is repeatedly struggling, sounds highly frustrated, or specifically asks to connect with a teacher or human, you MUST ask for their permission in Hinglish before sharing their details (e.g., "Kya main aapki details aur aap kis topic mein struggle kar rahe hain, apne teacher ko send kar sakti hoon taaki wo aapki help karein?"). If they say yes, invoke `create_escalation` with a short summary of their reason, the urgency (default is 'Medium' or 'High' if they are very upset), and the follow-up method ('Phone Call'). Read out the reference Ticket ID clearly and explain that a teacher will follow up with them. If they say no, do NOT call the tool; respect their privacy and try to reassure them.
 """
 
 
@@ -163,26 +219,35 @@ class Assistant(Agent):
         name: str,
         current_level: str = "Beginner",
         topics_covered: str = "",
-        mistakes_kept_making: str = ""
+        mistakes_kept_making: str = "",
     ) -> str:
         """Saves the student's name and learning details to memory.
         You must ask the user for permission in Hinglish before invoking this tool.
         """
-        logger.info(f"Tool save_caller_info called for user_id {self.user_id}: name={name}")
-        save_user(self.user_id, name, "Hinglish", current_level, topics_covered, mistakes_kept_making)
+        logger.info(
+            f"Tool save_caller_info called for user_id {self.user_id}: name={name}"
+        )
+        save_user(
+            self.user_id,
+            name,
+            "Hinglish",
+            current_level,
+            topics_covered,
+            mistakes_kept_making,
+        )
         return "Successfully saved user info to memory."
 
     @function_tool
     async def lookup_word_definition(self, context: RunContext, word: str) -> str:
         """Fetches the definition, part of speech, and an example sentence of an English word.
         Call this tool when the user asks for the meaning, definition, or explanation of a specific English word.
-        
+
         Args:
             word: The English word to define (e.g. 'celebrate', 'gravity').
         """
-        import urllib.request
         import json
         import urllib.parse
+        import urllib.request
         from datetime import datetime
 
         logger.info(f"Looking up word definition for: '{word}'")
@@ -190,18 +255,18 @@ class Assistant(Agent):
         timestamp = datetime.now().strftime("%d %b %Y, %I:%M %p")
 
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             # 3 second timeout for quick response
             with urllib.request.urlopen(req, timeout=3) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                meanings = data[0]['meanings']
-                part_of_speech = meanings[0]['partOfSpeech']
-                definition = meanings[0]['definitions'][0]['definition']
-                
+                data = json.loads(response.read().decode("utf-8"))
+                meanings = data[0]["meanings"]
+                part_of_speech = meanings[0]["partOfSpeech"]
+                definition = meanings[0]["definitions"][0]["definition"]
+
                 # Try to get an example sentence
-                example = meanings[0]['definitions'][0].get('example', '')
+                example = meanings[0]["definitions"][0].get("example", "")
                 example_str = f" Example sentence: '{example}'." if example else ""
-                
+
                 return f"Word: '{word}' [{part_of_speech}]. Definition: {definition}.{example_str} (Fetched live as of {timestamp})"
         except urllib.error.HTTPError as he:
             if he.code == 404:
@@ -216,41 +281,137 @@ class Assistant(Agent):
         """Fetches a random primary-school level trivia question (General Knowledge / Science) with multiple choice options.
         Call this tool when the student says they want to play a game, solve a quiz, answer a question, or practice.
         """
-        import urllib.request
         import json
+        import urllib.request
         from datetime import datetime
-        import html
 
         logger.info("Fetching quiz question...")
         url = "https://opentdb.com/api.php?amount=1&category=9&difficulty=easy&type=multiple"
         timestamp = datetime.now().strftime("%d %b %Y, %I:%M %p")
 
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             # 3 second timeout
             with urllib.request.urlopen(req, timeout=3) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                if data['response_code'] == 0:
-                    result = data['results'][0]
+                data = json.loads(response.read().decode("utf-8"))
+                if data["response_code"] == 0:
+                    result = data["results"][0]
                     # Decode HTML entities in text
-                    question = html.unescape(result['question'])
-                    correct_answer = html.unescape(result['correct_answer'])
-                    incorrect_answers = [html.unescape(ans) for ans in result['incorrect_answers']]
-                    
-                    options = incorrect_answers + [correct_answer]
+                    question = html.unescape(result["question"])
+                    correct_answer = html.unescape(result["correct_answer"])
+                    incorrect_answers = [
+                        html.unescape(ans) for ans in result["incorrect_answers"]
+                    ]
+
+                    options = [*incorrect_answers, correct_answer]
                     import random
+
                     random.shuffle(options)
-                    
-                    return json.dumps({
-                        "question": question,
-                        "options": options,
-                        "correct_answer": correct_answer,
-                        "timestamp": f"Fetched live as of {timestamp}"
-                    })
+
+                    return json.dumps(
+                        {
+                            "question": question,
+                            "options": options,
+                            "correct_answer": correct_answer,
+                            "timestamp": f"Fetched live as of {timestamp}",
+                        }
+                    )
                 return f"Error: Quiz server returned code {data['response_code']}. Please try again. (Checked as of {timestamp})"
         except Exception as e:
             logger.error(f"Error in fetch_quiz_question: {e}")
             return f"Error: Quiz server timed out or is temporarily unavailable. Please try again in a moment. (Checked as of {timestamp})"
+
+    @function_tool
+    async def create_escalation(
+        self,
+        context: RunContext,
+        reason: str,
+        urgency: str = "Medium",
+        follow_up_method: str = "Phone Call",
+    ) -> str:
+        """Create a human help request / ticket when the student is repeatedly struggling,
+        needs a real teacher's help, or is frustrated.
+
+        Before invoking this tool, you MUST explicitly ask the student for permission in Hinglish.
+
+        Args:
+            reason: The topic/reason why the student needs help (e.g. 'Struggling with Division').
+            urgency: How urgent this request is ('Low', 'Medium', 'High'). Default is 'Medium'.
+            follow_up_method: How the teacher should follow up (e.g. 'Phone Call').
+        """
+        import json
+        import os
+        import urllib.request
+        from datetime import datetime
+
+        from database import create_ticket, get_user
+
+        logger.info(
+            f"Tool create_escalation called for user_id {self.user_id}: reason={reason}"
+        )
+
+        # Look up student's details
+        name = "Unknown Student"
+        topics_covered = ""
+        user_data = get_user(self.user_id)
+        if user_data:
+            name = user_data.get("name", "Unknown Student")
+            topics_covered = user_data.get("topics_covered", "")
+
+        # Create ticket in local database
+        ticket_id = create_ticket(
+            self.user_id, name, reason, topics_covered, urgency, follow_up_method
+        )
+
+        # Discord Webhook Notification
+        webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+        if webhook_url:
+            embed_color = (
+                16711680
+                if urgency.lower() == "high"
+                else (16776960 if urgency.lower() == "medium" else 65280)
+            )
+            payload = {
+                "embeds": [
+                    {
+                        "title": "🚨 Human Escalation Triggered!",
+                        "color": embed_color,
+                        "fields": [
+                            {"name": "Ticket ID", "value": ticket_id, "inline": True},
+                            {"name": "Student Name", "value": name, "inline": True},
+                            {"name": "Urgency", "value": urgency, "inline": True},
+                            {"name": "Reason for Help", "value": reason},
+                            {
+                                "name": "Topics Covered",
+                                "value": topics_covered or "None",
+                            },
+                            {
+                                "name": "Follow-up Method",
+                                "value": follow_up_method,
+                                "inline": True,
+                            },
+                        ],
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ]
+            }
+            try:
+                req = urllib.request.Request(
+                    webhook_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "User-Agent": "Mozilla/5.0",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=3) as res:
+                    logger.info(
+                        f"Escalation successfully posted to Discord! Status: {res.status}"
+                    )
+            except Exception as ex:
+                logger.error(f"Failed to post escalation to Discord webhook: {ex}")
+
+        return f"Escalation ticket created successfully. Reference Ticket ID is '{ticket_id}'."
 
 
 server = AgentServer()
@@ -275,23 +436,20 @@ async def my_agent(ctx: JobContext):
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(
-            model="nova-3",
-            language="multi"
-        ),
+        stt=deepgram.STT(model="nova-3", language="multi"),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
-                model="gemini-3.5-flash-lite",
-            ),
+            model="gemini-3.5-flash-lite",
+        ),
         # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
         # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
-                voice="en-IN-pooja", 
-                style="Conversational",
-                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
-                text_pacing=True
-            ),
+            voice="Anisha",
+            style="Conversation",
+            tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+            text_pacing=True,
+        ),
         # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
         # See more at https://docs.livekit.io/agents/build/turns
         turn_detection=MultilingualModel(),
