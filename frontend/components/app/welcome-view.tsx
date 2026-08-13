@@ -169,7 +169,7 @@ export const WelcomeView = ({
           <strong className="text-foreground/90">LiveKit</strong>
         </p>
         <p className="text-muted-foreground/60 max-w-xs text-[10px]">
-          Built for the Day 3 challenge of 10 Days of AI Voice Agents.
+          Part of the 10 Days of AI Voice Agents challenge.
         </p>
       </div>
     </div>
