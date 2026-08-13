@@ -188,6 +188,8 @@ CALLEE_IDENTITY = "phone-user"
 class OutboundAgent(Agent):
     def __init__(self, ctx: JobContext, user_id: str) -> None:
         self.user_id = user_id
+        self.call_outcome = "Failure"
+        self.failure_reason = "Incomplete"
         super().__init__(instructions=SYSTEM_PROMPT)
         self.ctx = ctx
 
@@ -257,6 +259,8 @@ class OutboundAgent(Agent):
                 example = meanings[0]["definitions"][0].get("example", "")
                 example_str = f" Example sentence: '{example}'." if example else ""
 
+                self.call_outcome = "Success"
+                self.failure_reason = None
                 return f"Word: '{word}' [{part_of_speech}]. Definition: {definition}.{example_str} (Fetched live as of {timestamp})"
         except urllib.error.HTTPError as he:
             if he.code == 404:
@@ -298,6 +302,8 @@ class OutboundAgent(Agent):
 
                     random.shuffle(options)
 
+                    self.call_outcome = "Success"
+                    self.failure_reason = None
                     return json.dumps(
                         {
                             "question": question,
@@ -339,6 +345,9 @@ class OutboundAgent(Agent):
         logger.info(
             f"Tool create_escalation called for user_id {self.user_id}: reason={reason}"
         )
+
+        self.call_outcome = "Failure"
+        self.failure_reason = "Upset/Struggled"
 
         # Look up student's details
         name = "Unknown Student"
@@ -527,11 +536,63 @@ async def outbound_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
+    # Create OutboundAgent instance
+    agent_instance = OutboundAgent(ctx, user_id=user_id)
+
+    from datetime import datetime
+
+    from database import create_call_record, get_user, update_call_outcome
+
+    start_time = datetime.now()
+    call_id = ctx.room.name
+
+    # Try to resolve user's name if they have a profile already
+    user_profile = get_user(user_id)
+    name = user_profile.get("name", "New Learner") if user_profile else "New Learner"
+
+    # Log call start
+    create_call_record(call_id, user_id, name, "SIP")
+
+    # Register shutdown callback
+    async def on_shutdown():
+        # Retrieve latest user profile again (in case they saved their name during the call)
+        up = get_user(user_id)
+        latest_name = up.get("name", name) if up else name
+
+        # Calculate duration
+        duration = int((datetime.now() - start_time).total_seconds())
+
+        # Read final stats from agent_instance
+        outcome = agent_instance.call_outcome
+        failure_reason = agent_instance.failure_reason
+
+        # Update name in database just in case they added a name
+        from database import get_db_connection
+
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE calls SET name = ? WHERE call_id = ?", (latest_name, call_id)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error updating call name in db: {e}")
+
+        # Log outcome
+        update_call_outcome(call_id, outcome, duration, failure_reason)
+        logger.info(
+            f"Session closed: call_id={call_id}, user={latest_name}, duration={duration}s, outcome={outcome}, reason={failure_reason}"
+        )
+
+    ctx.add_shutdown_callback(on_shutdown)
+
     # Start the session while the phone is still ringing so the models are warm
     # by the time somebody picks up.
     session_started = asyncio.create_task(
         session.start(
-            agent=OutboundAgent(ctx, user_id=user_id),
+            agent=agent_instance,
             room=ctx.room,
             room_options=room_io.RoomOptions(
                 audio_input=room_io.AudioInputOptions(
