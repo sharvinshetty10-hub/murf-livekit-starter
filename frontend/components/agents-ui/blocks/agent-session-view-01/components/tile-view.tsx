@@ -120,14 +120,14 @@ export function TileLayout({
         return (
           <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 text-xs font-bold text-orange-600 shadow-xs dark:text-orange-400">
             <span className="h-2 w-2 animate-bounce rounded-full bg-orange-500" />
-            🤔 Saathi is thinking...
+            🤔 Thinking...
           </div>
         );
       case 'speaking':
         return (
           <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-4 py-1.5 text-xs font-bold text-teal-600 shadow-xs dark:text-teal-400">
             <span className="h-2 w-2 animate-ping rounded-full bg-teal-500" />
-            🔊 Saathi is speaking...
+            🔊 Speaking...
           </div>
         );
       default:
