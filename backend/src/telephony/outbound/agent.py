@@ -109,6 +109,7 @@ from livekit.agents import (
     Agent,
     AgentServer,
     AgentSession,
+    ChatContext,
     JobContext,
     JobProcess,
     RunContext,
@@ -176,6 +177,7 @@ MEMORY & TOOLS:
 - Failure Handling Out Loud: If any API tool fails or times out (returns an "Error:" prefix), explain this politely to the caller in Hinglish instead of going silent.
 - If the person asks for a human, use the transfer_to_human tool. If you reach a voicemail, use the detected_answering_machine tool. When the call is finished, use the end_call tool.
 - Human Handoff / Teacher Escalation (STRICT CONDITION): If the student is repeatedly struggling (e.g., fails multiple times, sounds distressed, or says "kuch samajh nahi aa raha"), or specifically asks to talk to a teacher/human tutor, first show empathy using Hinglish fillers (e.g., "अरे, aap bilkul pareshan mot hoiye, main samajh sakti hoon..."), and ask for their verbal permission to escalate (e.g., "Kya main aapki details apne teacher ko bhej sakti hoon taaki wo aapki help karein?"). If and ONLY if they agree, invoke the `create_escalation` tool. For all normal learning, explanations, word lookups, or successful quizzes, DO NOT invoke the tool under any circumstance to ensure both test paths are distinct. Read out the generated ticket ID and next steps clearly.
+- Specialist Handoff (Maths): If the student explicitly asks to study mathematics, practice math, learn fractions, algebra, or solve math problems, you MUST announce the handoff in Hinglish (e.g., "Main aapko hamare Maths specialist se connect karti hoon. Ek second rukiye.") and call the `transfer_to_maths` tool immediately.
 """
 
 # The first thing the person hears when they pick up.
@@ -183,6 +185,50 @@ GREETING = "Namaste! Main hoon Saathi. Aapke daily practice session ke liye main
 
 # The identity LiveKit gives the person we call. Used to transfer them later.
 CALLEE_IDENTITY = "phone-user"
+
+
+MATH_PROMPT = """IDENTITY:
+You are Samar, Saathi's specialized Math Tutor. You are patient, warm, and highly encouraging, focused exclusively on helping the student practice and master mathematics.
+
+OBJECTIVES:
+- Teach and practice mathematics concepts (like addition, division, fractions, geometry, algebra).
+- Break down complex equations and math problems into simple, child-friendly Hinglish examples (like dividing rotis, sharing chocolate bars, or counting cricket runs).
+- Check for understanding and solve problems step-by-step with the student.
+- Greet them by saying you are taking over the session as the Maths Specialist.
+
+KNOWLEDGE LIMITS:
+- You ONLY handle math topics. If the student asks about language, history, general science, or other non-math subjects, gently guide them back to math (e.g., "Main aapka maths partner hoon, chalo maths ka ek question solve karein!").
+
+LANGUAGE & SCRIPT:
+- Support Hinglish (mixing Hindi and English) dynamically!
+- Keep answers very short (1-2 sentences at a time).
+- Always write every language in its own native script:
+  - Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
+  - Same rule for all non-English languages.
+"""
+
+
+class MathSpecialist(Agent):
+    def __init__(self, user_id: str, chat_ctx: ChatContext | None = None) -> None:
+        self.user_id = user_id
+        self.call_outcome = "Success"
+        self.failure_reason = None
+        super().__init__(
+            instructions=MATH_PROMPT,
+            chat_ctx=chat_ctx,
+            tts=murf.TTS(
+                voice="Samar",
+                style="Conversation",
+                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+                text_pacing=True,
+            ),
+        )
+
+    async def on_enter(self) -> None:
+        logger.info(f"MathSpecialist entered session for user_id: {self.user_id}")
+        await self.session.generate_reply(
+            instructions="Introduce yourself warmly in Devanagari Hinglish as the Maths Specialist (Samar) taking over, and ask what math topic they want to solve or practice today."
+        )
 
 
 class OutboundAgent(Agent):
@@ -203,6 +249,18 @@ class OutboundAgent(Agent):
         if user_data:
             return f"Returning User Profile: name='{user_data['name']}', current_level='{user_data['current_level']}', topics_covered='{user_data['topics_covered']}', mistakes_kept_making='{user_data['mistakes_kept_making']}'"
         return "New Caller: No profile found."
+
+    @function_tool
+    async def transfer_to_maths(self, context: RunContext) -> tuple[Agent, str]:
+        """Transfer the student to the Maths Specialist when they want to study mathematics, practice math, learn fractions, algebra, or solve math problems."""
+        logger.info(f"Handoff triggered: transfer_to_maths for user_id: {self.user_id}")
+        math_agent = MathSpecialist(
+            user_id=self.user_id, chat_ctx=self.chat_ctx.copy(exclude_instructions=True)
+        )
+        return (
+            math_agent,
+            "Main aapko hamare Maths specialist se connect karti hoon. Ek second rukiye.",
+        )
 
     @function_tool
     async def save_caller_info(
